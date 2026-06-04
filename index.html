@@ -1132,14 +1132,22 @@
 
 <script>
 // ═══════════════════════════════════════════════
-//  CONFIGURATION — CHANGE THESE
+//  CONFIGURATION
 // ═══════════════════════════════════════════════
 const CONFIG = {
-  password: "secret123",       // 🔑 Change this to your secret password
-  user1Name: "Alex",           // 👤 Name for person 1
-  user2Name: "Jordan",         // 👤 Name for person 2
-  autoLockMinutes: 5,          // ⏱️ Auto-lock after X minutes of inactivity
-  storageKey: "lp_chat_v1"     // localStorage key prefix
+  users: {
+    "Jack": "jack007",   // 👤 Jack's password
+    "Rose": "rose007"    // 👤 Rose's password
+  },
+  autoLockMinutes: 5,
+  storageKey: "lp_chat_v2",
+  // ─── Firebase config (free) — paste yours here after setup ───
+  // If you haven't set up Firebase yet, chat saves locally only.
+  firebase: null
+  // firebase: {
+  //   apiKey: "YOUR_API_KEY",
+  //   databaseURL: "https://YOUR_PROJECT.firebaseio.com"
+  // }
 };
 
 // ═══════════════════════════════════════════════
@@ -1180,10 +1188,12 @@ function closePasswordModal() {
 }
 
 function checkPassword() {
-  const val = document.getElementById('passwordInput').value;
-  if (val === CONFIG.password) {
+  const val = document.getElementById('passwordInput').value.trim();
+  const matchedUser = Object.keys(CONFIG.users).find(name => CONFIG.users[name] === val);
+  if (matchedUser) {
     closePasswordModal();
-    determineUser();
+    currentUser = matchedUser;
+    sessionStorage.setItem('lp_user', matchedUser);
     openChat();
   } else {
     const err = document.getElementById('modalError');
@@ -1191,31 +1201,6 @@ function checkPassword() {
     document.getElementById('passwordInput').value = '';
     setTimeout(() => { err.style.display = 'none'; }, 3000);
   }
-}
-
-// ═══════════════════════════════════════════════
-//  USER ASSIGNMENT (2 users only)
-// ═══════════════════════════════════════════════
-function determineUser() {
-  // Check if a user slot is stored in this browser session
-  let myUser = sessionStorage.getItem('lp_user');
-  if (!myUser) {
-    const users = loadData('users') || {};
-    const now = Date.now();
-    // Clean up stale users (offline > 30s)
-    Object.keys(users).forEach(k => {
-      if (now - users[k].lastSeen > 30000) delete users[k];
-    });
-    if (!users[CONFIG.user1Name]) {
-      myUser = CONFIG.user1Name;
-    } else if (!users[CONFIG.user2Name]) {
-      myUser = CONFIG.user2Name;
-    } else {
-      myUser = CONFIG.user1Name; // fallback
-    }
-    sessionStorage.setItem('lp_user', myUser);
-  }
-  currentUser = myUser;
 }
 
 // ═══════════════════════════════════════════════
@@ -1240,7 +1225,8 @@ function openChat() {
   document.getElementById('mainSite').style.display = 'none';
   document.getElementById('notifBadge').style.display = 'none';
 
-  const otherName = currentUser === CONFIG.user1Name ? CONFIG.user2Name : CONFIG.user1Name;
+  const allUsers = Object.keys(CONFIG.users);
+  const otherName = allUsers.find(n => n !== currentUser) || allUsers[0];
   document.getElementById('otherName').textContent = otherName;
   document.getElementById('avatarInitial').textContent = otherName.charAt(0);
 
@@ -1402,7 +1388,8 @@ function clearPresencePolling() {
 
 function pollOtherUser() {
   const users = loadData('users') || {};
-  const otherName = currentUser === CONFIG.user1Name ? CONFIG.user2Name : CONFIG.user1Name;
+  const allUsers = Object.keys(CONFIG.users);
+  const otherName = allUsers.find(n => n !== currentUser) || allUsers[0];
   const other = users[otherName];
   const dot = document.getElementById('otherOnlineDot');
   const statusEl = document.getElementById('otherStatus');
@@ -1513,7 +1500,7 @@ function lockChat() {
 
 function unlockChat() {
   const val = document.getElementById('lockInput').value;
-  if (val === CONFIG.password) {
+  if (currentUser && val === CONFIG.users[currentUser]) {
     document.getElementById('lockScreen').style.display = 'none';
     resetInactivityTimer();
     document.getElementById('chatInput').focus();
